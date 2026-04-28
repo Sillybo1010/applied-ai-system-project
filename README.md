@@ -1,5 +1,9 @@
 # CineMatch — Movie Recommender System
 
+**Docs:** [model_card.md](model_card.md) | [assets/architecture.md](assets/architecture.md)
+
+---
+
 ## Original Project Reference
 
 This project is adapted from **VibeFinder 1.0**, a music recommendation system built in Modules 1–3. VibeFinder used an 8-component content-based scoring algorithm to match songs to listener profiles based on audio features like energy, tempo, valence, danceability, and acousticness. It demonstrated how weighted similarity metrics and diversity penalties could generate personalized, non-repetitive music recommendations from a small catalog.
@@ -18,17 +22,58 @@ It matters because most recommender systems are black boxes. CineMatch explains 
 
 ## Architecture Overview
 
-```
-CSV Data → Loader → Recommender Agent → Scorer → Diversity Filter → Explainer → Output
-                          ↑
-                    UserProfile (Human Input)
-                          ↓
-                    Human Review (main.py)
-                          ↓
-                    Pytest Suite (Testing)
+```mermaid
+flowchart TD
+    CSV["data/movies.csv\n20 movies · 14 features"]
+    DIRJSON["data/director_profiles.json\n17 director style profiles (RAG)"]
+    HUMAN["Human Input\nUserProfile\ngenre · mood · intensity\ntone · pacing · runtime"]
+    LOADER["Data Loader\nload_movies()"]
+    RAG["RAGRetriever\naugment_explanation()"]
+    WEIGHTS["_DEFAULT_WEIGHTS\nbalanced · genre-first\nmood-first · vibe-first"]
+    SCORER["Scorer\nscore_movie()"]
+    DIVERSITY["Diversity Filter\n-20% per repeat director"]
+    CINEAGENT["CineAgent\n5-step observable chain"]
+    SPEC["Specializer\nSTANDARD · CASUAL · CINEPHILE"]
+    AGENT["Recommender Agent\nRecommender.recommend()"]
+    EXPLAIN["Explainer\nexplain_recommendation()"]
+    OUTPUT["Output\nRanked Top-K · Score · Confidence · Why"]
+    REVIEW["Human Review\nmain.py — 6 personas"]
+    TESTS["Eval Harness\ntests/eval_harness.py\n8 tests · PASS/FAIL · confidence"]
+
+    CSV --> LOADER --> AGENT
+    DIRJSON --> RAG
+    HUMAN --> AGENT
+    HUMAN --> WEIGHTS --> SCORER
+    AGENT --> SCORER --> DIVERSITY --> AGENT
+    AGENT --> EXPLAIN
+    RAG --> EXPLAIN
+    EXPLAIN --> SPEC --> OUTPUT --> REVIEW
+    CINEAGENT --> AGENT
+    CINEAGENT --> RAG
+    AGENT -.->|unit test| TESTS
+    EXPLAIN -.->|unit test| TESTS
+    RAG -.->|unit test| TESTS
+    SPEC -.->|unit test| TESTS
+    TESTS -.->|pass/fail| REVIEW
+
+    style HUMAN     fill:#d4edda,stroke:#28a745,color:#000
+    style REVIEW    fill:#d4edda,stroke:#28a745,color:#000
+    style TESTS     fill:#fff3cd,stroke:#ffc107,color:#000
+    style AGENT     fill:#cce5ff,stroke:#004085,color:#000
+    style CINEAGENT fill:#cce5ff,stroke:#004085,color:#000
+    style SCORER    fill:#cce5ff,stroke:#004085,color:#000
+    style DIVERSITY fill:#cce5ff,stroke:#004085,color:#000
+    style EXPLAIN   fill:#cce5ff,stroke:#004085,color:#000
+    style SPEC      fill:#cce5ff,stroke:#004085,color:#000
+    style RAG       fill:#fde8d8,stroke:#e07020,color:#000
+    style DIRJSON   fill:#f8d7da,stroke:#721c24,color:#000
+    style CSV       fill:#f8d7da,stroke:#721c24,color:#000
+    style LOADER    fill:#f8d7da,stroke:#721c24,color:#000
+    style WEIGHTS   fill:#e2d9f3,stroke:#6f42c1,color:#000
+    style OUTPUT    fill:#f0f0f0,stroke:#666,color:#000
 ```
 
-The full Mermaid diagram is in [assets.txt](assets.txt).
+Full diagram with color key: [assets/architecture.md](assets/architecture.md)
 
 | Component | File | Role |
 |---|---|---|
@@ -65,6 +110,14 @@ python src/main.py
 ```bash
 python -m pytest tests/ -v
 ```
+
+---
+
+## Demo Walkthrough
+
+> **Loom video:** [https://www.loom.com/share/REPLACE-WITH-YOUR-LOOM-ID](https://www.loom.com/share/REPLACE-WITH-YOUR-LOOM-ID)
+>
+> The walkthrough shows `python src/main.py` running end-to-end: three user profiles (Action Fan, Drama Seeker, Ghost Genre Western), the RAG before/after uplift section, and the evaluation summary. Below are the same three examples as text output.
 
 ---
 
@@ -197,6 +250,89 @@ EVALUATION SUMMARY (balanced mode, 20% diversity penalty)
 
 **What I learned:**
 Confidence scoring exposed something the tests alone could not: the system can look highly confident (93%) while making a logically contradictory recommendation. That gap — between mathematical confidence and real-world correctness — is where human evaluation becomes essential.
+
+---
+
+## Stretch Features (+8 points)
+
+### RAG Enhancement — `src/rag_retriever.py` + `data/director_profiles.json`
+
+A second data source (`director_profiles.json`) stores unstructured style descriptions for all 17 directors in the catalog. `RAGRetriever` retrieves director context at recommendation time and appends it to the base explanation.
+
+**Measurable improvement:**
+```
+Base explanation    (31 words):  Genre match: action | Mood match: intense | Intensity close...
+Augmented by RAG   (54 words, +74%):  ...same as above...
+  [RAG] Director - redefining action filmmaking through pure sustained intensity.
+        Style: maximalist visual storytelling, minimal dialogue, relentless kinetic action.
+```
+Run: `python -c "from src.rag_retriever import RAGRetriever; ..."`
+
+---
+
+### Agentic Workflow — `src/agent.py`
+
+`CineAgent.run()` executes recommendation as a 5-step observable chain. Every intermediate decision is printed so the reasoning is fully auditable.
+
+**Sample output:**
+```
+------------------------------------------------------------
+[AGENT] Recommend for 'High-Intensity Action Fan'
+  [STEP 1/5] PLAN: genre='action', mood='intense', intensity=0.90 => strategy: 'vibe-first'
+  [STEP 2/5] RETRIEVE: 20 movies from CSV  +  17 director profiles from RAG store
+  [STEP 3/5] FILTER: 3 genre match(es), 3 mood match(es) out of 20 total
+  [STEP 4/5] SCORE: top result: 'Mad Max Fury Road'  raw=8.0070  conf=96%
+  [STEP 5/5] EXPLAIN: RAG context attached for 3/3 results
+[AGENT] Done - 3 results, avg confidence: 83%
+
+[AGENT] Recommend for 'Ghost Genre: Western'
+  [STEP 3/5] FILTER: 0 genre matches -- GHOST GENRE, falling back to vibe similarity
+  [STEP 4/5] SCORE: top result: 'Whiplash'  raw=6.2672  conf=75%
+```
+Run: `python src/agent.py`
+
+---
+
+### Fine-Tuning / Specialization — `src/specializer.py`
+
+Three few-shot explanation modes that produce measurably different output:
+
+| Mode | Words | Lexical diversity | Sample |
+|---|---|---|---|
+| `standard` | 18 | 0.83 | `'Mad Max Fury Road' \| Genre match: action \| Mood match: intense` |
+| `casual` | 23 | 0.91 | `This one's perfect for you — it's action, intense, and super intense. Runtime is spot-on.` |
+| `cinephile` | 45 | 0.89 | `'Mad Max Fury Road' represents a canonical instance of action filmmaking... George Miller's direction is characteristically viscerally high-octane...` |
+
+`measure_modes(movie, profile)` returns word count and lexical diversity for all three so the difference is quantifiable, not just visible.
+
+---
+
+### Test Harness / Evaluation Script — `tests/eval_harness.py`
+
+Dedicated evaluation script: 8 predefined inputs, structured PASS/FAIL per test, confidence ratings, one-line summary.
+
+```
+python tests/eval_harness.py
+```
+
+```
+============================================================
+CINEMATIC EVAL HARNESS
+============================================================
+  [PASS]  Action fan: genre match in top result
+  [PASS]  Drama seeker: genre match in top result
+  [PASS]  Animation fan: animation appears in top 3
+  [PASS]  Results are sorted highest score first
+  [PASS]  Confidence score is always 0.0 - 1.0
+  [PASS]  Ghost genre scores lower confidence than real genre match
+  [PASS]  RAG: augmented explanation is longer than base explanation
+  [PASS]  Specializer: cinephile output longer than casual output
+============================================================
+Result  : 8 passed, 0 failed out of 8 tests
+Avg top-result confidence : 96%
+All tests passed.
+============================================================
+```
 
 ---
 

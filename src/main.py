@@ -4,8 +4,10 @@ import sys
 
 try:
     from recommender import UserProfile, Recommender, load_movies
+    from rag_retriever import RAGRetriever
 except ImportError:
     from src.recommender import UserProfile, Recommender, load_movies
+    from src.rag_retriever import RAGRetriever
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,7 +20,8 @@ except ImportError:
     print("Install tabulate:  pip install tabulate")
     sys.exit(1)
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "movies.csv")
+DATA_PATH     = os.path.join(os.path.dirname(__file__), "..", "data", "movies.csv")
+PROFILES_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "director_profiles.json")
 
 # ── User profiles: 3 standard + 3 edge-case ──────────────────────────────────
 
@@ -157,6 +160,25 @@ if __name__ == "__main__":
         results = rec.recommend(drama, k=5, mode="balanced", diversity_penalty=penalty)
         titles = ", ".join(m.title for m, _ in results)
         print(f"  {label}: {titles}")
+
+    # ── RAG Enhancement: before / after demonstration ─────────────────────────
+    rag = RAGRetriever(PROFILES_PATH)
+    demo_profile = profiles[0]  # High-Intensity Action Fan
+    demo_result  = rec.recommend(demo_profile, k=1, mode="balanced")[0][0]
+
+    base_explanation = rec.explain_recommendation(demo_profile, demo_result)
+    augmented_explanation = rag.augment_explanation(base_explanation, demo_result, demo_profile)
+    uplift = RAGRetriever.measure_improvement(base_explanation, augmented_explanation)
+
+    print(f"\n{'='*70}")
+    print("RAG ENHANCEMENT — Before / After")
+    print(f"{'='*70}")
+    print(f"Movie  : {demo_result.title}  (director: {demo_result.director})")
+    print(f"\n  [BASE — no RAG]\n  {base_explanation}")
+    print(f"\n  [AUGMENTED — with RAG director profile]\n  {augmented_explanation}")
+    print(f"\n  Uplift : +{uplift['added_words']} words "
+          f"({uplift['base_words']} -> {uplift['aug_words']}, "
+          f"+{uplift['pct_increase']}%)")
 
     # ── Evaluation summary ────────────────────────────────────────────────────
     print(f"\n{'='*70}")

@@ -1,0 +1,104 @@
+{
+  "Christopher Nolan": {
+    "style": "nonlinear narrative structure, practical effects over CGI, dense layered exposition",
+    "themes": ["time manipulation", "identity", "obsession", "reality vs illusion"],
+    "tone_signature": "cerebral and intense with philosophical undertones",
+    "known_for": "mind-bending high-concept thrillers that reward repeat viewing"
+  },
+  "Frank Darabont": {
+    "style": "slow deliberate pacing, heavy dialogue, strong ensemble performances, earned emotional payoffs",
+    "themes": ["hope and perseverance", "injustice", "friendship", "redemption"],
+    "tone_signature": "quietly emotional and deeply humanist",
+    "known_for": "grounding genre material in authentic human relationships"
+  },
+  "John Lasseter": {
+    "style": "vibrant animation, rapid physical comedy, sincere emotional arcs, child-adult crossover appeal",
+    "themes": ["identity", "friendship", "growing up", "loyalty"],
+    "tone_signature": "warm and playful with genuine heart",
+    "known_for": "pioneering computer animation with timeless storytelling"
+  },
+  "Jordan Peele": {
+    "style": "social commentary embedded in genre horror, slow-burn tension, subversive twists",
+    "themes": ["racial identity", "systemic oppression", "paranoia", "assimilation"],
+    "tone_signature": "unsettling and provocative beneath a polished surface",
+    "known_for": "elevating horror into sharp cultural critique"
+  },
+  "Wes Anderson": {
+    "style": "symmetrical framing, pastel colour palette, deadpan dialogue, ensemble casts, highly stylised production design",
+    "themes": ["nostalgia", "family dysfunction", "loss", "whimsy vs melancholy"],
+    "tone_signature": "quirky and melancholic with meticulous visual precision",
+    "known_for": "creating instantly recognisable worlds that feel like animated dioramas"
+  },
+  "Bong Joon-ho": {
+    "style": "genre blending, social class critique, unpredictable tonal shifts, precise blocking and staging",
+    "themes": ["class inequality", "capitalism", "survival", "moral ambiguity"],
+    "tone_signature": "darkly comedic then suddenly brutal",
+    "known_for": "seamlessly mixing satire with visceral thriller tension"
+  },
+  "Damien Chazelle": {
+    "style": "kinetic editing matched to music, obsessive protagonists, jazz and dance as metaphor, long takes in performance sequences",
+    "themes": ["ambition vs happiness", "artistic sacrifice", "passion", "perfectionism"],
+    "tone_signature": "electrifying and emotionally raw",
+    "known_for": "making music feel physically urgent and emotionally devastating"
+  },
+  "George Miller": {
+    "style": "maximalist visual storytelling, minimal dialogue, relentless kinetic action, world-building through environmental detail",
+    "themes": ["survival", "redemption", "post-apocalyptic society", "feminine resilience"],
+    "tone_signature": "viscerally overwhelming and mythic in scale",
+    "known_for": "redefining action filmmaking through pure sustained intensity"
+  },
+  "Barry Jenkins": {
+    "style": "intimate close-ups, lush non-diegetic score, lyrical naturalistic dialogue, long contemplative silences",
+    "themes": ["identity", "love", "Black American experience", "tenderness", "belonging"],
+    "tone_signature": "tender and quietly heartbreaking",
+    "known_for": "finding profound beauty in marginalized experiences"
+  },
+  "Joss Whedon": {
+    "style": "ensemble juggling, quippy dialogue, character-driven spectacle, crowd-pleasing set pieces",
+    "themes": ["teamwork", "heroism", "sacrifice", "found family"],
+    "tone_signature": "energetic and crowd-pleasing with witty banter",
+    "known_for": "making large ensemble casts feel cohesive and fun"
+  },
+  "Spike Jonze": {
+    "style": "emotionally grounded surrealism, restrained performance direction, melancholic romanticism, sparse visual design",
+    "themes": ["loneliness", "connection", "modern alienation", "love and loss"],
+    "tone_signature": "quietly devastating emotional intimacy",
+    "known_for": "finding sadness and wonder in unexpected everyday concepts"
+  },
+  "Lee Unkrich": {
+    "style": "vibrant world-building, emotional sincerity, culturally specific storytelling, strong musical integration",
+    "themes": ["family", "memory", "cultural heritage", "legacy"],
+    "tone_signature": "joyful on the surface with deep emotional undercurrents",
+    "known_for": "crafting animated films that genuinely move adult audiences"
+  },
+  "Ari Aster": {
+    "style": "slow deliberate dread, long takes, domestic horror, grief as genre engine, unsettling imagery",
+    "themes": ["grief", "family trauma", "mental illness", "loss of control"],
+    "tone_signature": "relentlessly bleak and psychologically destabilising",
+    "known_for": "transforming grief into suffocating cinematic horror"
+  },
+  "Martin Scorsese": {
+    "style": "kinetic camera movement, voice-over narration, operatic excess, morally compromised protagonists, rock music soundtracks",
+    "themes": ["ambition and corruption", "masculinity", "crime", "excess", "guilt"],
+    "tone_signature": "electric and morally ambivalent",
+    "known_for": "making you complicit in the seduction of bad behaviour"
+  },
+  "Pete Docter": {
+    "style": "high-concept emotional metaphor, deeply empathetic character design, bittersweet tonal balance",
+    "themes": ["growing up", "emotions and identity", "loss", "joy and sadness as partners"],
+    "tone_signature": "whimsical yet emotionally profound",
+    "known_for": "turning abstract human experience into vivid animated worlds"
+  },
+  "John Krasinski": {
+    "style": "restrained tension through silence and sound design, family-centred stakes, lean economic storytelling",
+    "themes": ["parental protection", "survival", "communication", "vulnerability"],
+    "tone_signature": "quietly terrifying with grounded emotional stakes",
+    "known_for": "building sustained dread through near-complete silence"
+  },
+  "Sam Mendes": {
+    "style": "technically ambitious long takes, immersive production design, war as personal journey, controlled emotional build",
+    "themes": ["duty and survival", "the human cost of war", "time and mortality"],
+    "tone_signature": "formally precise and emotionally exhausting",
+    "known_for": "staging intimate human stories on vast cinematic canvases"
+  }
+}

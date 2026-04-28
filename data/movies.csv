@@ -1,0 +1,21 @@
+id,title,director,genre,mood,intensity,runtime_min,tone,pacing,dialogue_heavy,popularity,release_decade,language,awards
+1,The Dark Knight,Christopher Nolan,action,thrilling,0.90,152,0.40,0.80,0.60,0.99,2000s,english,False
+2,Inception,Christopher Nolan,sci-fi,thrilling,0.80,148,0.50,0.70,0.50,0.97,2010s,english,False
+3,The Shawshank Redemption,Frank Darabont,drama,emotional,0.35,142,0.75,0.30,0.95,0.99,1990s,english,True
+4,Toy Story,John Lasseter,animation,heartwarming,0.50,81,0.92,0.80,0.70,0.95,1990s,english,True
+5,Interstellar,Christopher Nolan,sci-fi,epic,0.70,169,0.60,0.55,0.60,0.96,2010s,english,False
+6,Get Out,Jordan Peele,horror,scary,0.80,104,0.20,0.65,0.55,0.88,2010s,english,True
+7,The Grand Budapest Hotel,Wes Anderson,comedy,quirky,0.35,99,0.80,0.75,0.85,0.87,2010s,english,True
+8,Parasite,Bong Joon-ho,thriller,dark,0.70,132,0.25,0.60,0.75,0.93,2010s,foreign,True
+9,La La Land,Damien Chazelle,romance,romantic,0.30,128,0.82,0.50,0.70,0.90,2010s,english,True
+10,Mad Max Fury Road,George Miller,action,intense,0.97,120,0.45,0.97,0.10,0.92,2010s,english,True
+11,Moonlight,Barry Jenkins,drama,emotional,0.25,111,0.60,0.20,0.92,0.82,2010s,english,True
+12,The Avengers,Joss Whedon,action,fun,0.85,143,0.80,0.85,0.40,0.98,2010s,english,False
+13,Her,Spike Jonze,sci-fi,emotional,0.20,126,0.72,0.30,0.95,0.86,2010s,english,True
+14,Whiplash,Damien Chazelle,drama,intense,0.85,107,0.45,0.70,0.80,0.88,2010s,english,True
+15,Coco,Lee Unkrich,animation,heartwarming,0.50,105,0.90,0.72,0.65,0.94,2010s,english,True
+16,Hereditary,Ari Aster,horror,disturbing,0.70,127,0.10,0.40,0.55,0.80,2010s,english,False
+17,The Wolf of Wall Street,Martin Scorsese,drama,dark,0.70,180,0.55,0.80,0.75,0.91,2010s,english,False
+18,Inside Out,Pete Docter,animation,heartwarming,0.40,95,0.85,0.70,0.65,0.93,2010s,english,True
+19,A Quiet Place,John Krasinski,horror,scary,0.85,90,0.35,0.60,0.30,0.87,2010s,english,False
+20,1917,Sam Mendes,war,intense,0.90,119,0.40,0.80,0.30,0.90,2010s,english,True

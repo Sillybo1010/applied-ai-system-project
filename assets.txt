@@ -1,0 +1,73 @@
+CineMatch — Movie Recommender System Diagram
+=============================================
+
+```mermaid
+flowchart TD
+    %% ── Inputs ──────────────────────────────────────────────
+    CSV["📄 data/movies.csv\n20 movies · 14 features"]
+    HUMAN["🧑 Human Input\nUserProfile\ngenre · mood · intensity\ntone · pacing · runtime"]
+
+    %% ── Data Loader ─────────────────────────────────────────
+    LOADER["📦 Data Loader\nload_movies()\nParses CSV → Movie dataclasses"]
+
+    %% ── Scoring Engine ──────────────────────────────────────
+    WEIGHTS["⚙️ _DEFAULT_WEIGHTS\nRanking Mode\nbalanced · genre-first\nmood-first · vibe-first"]
+    SCORER["🧮 Scorer\nscore_movie()\nCategorical: genre + mood\nContinuous: intensity · tone\npacing · dialogue · runtime"]
+
+    %% ── Diversity Filter ────────────────────────────────────
+    DIVERSITY["🔀 Diversity Filter\napply_director_penalty()\n−20% per repeat director"]
+
+    %% ── Recommender Agent ───────────────────────────────────
+    AGENT["🤖 Recommender Agent\nRecommender.recommend()\nOrchestrates score → filter → rank"]
+
+    %% ── Explainer ───────────────────────────────────────────
+    EXPLAIN["💬 Explainer\nexplain_recommendation()\nWhy each film was picked"]
+
+    %% ── Outputs ─────────────────────────────────────────────
+    OUTPUT["📋 Output\nRanked Top-K Movies\nTitle · Score · Why"]
+
+    %% ── Human Review ────────────────────────────────────────
+    REVIEW["🧑‍⚖️ Human Review\nmain.py profiles\n6 personas · mode comparison\ndiversity ON vs OFF"]
+
+    %% ── Testing Layer ───────────────────────────────────────
+    TESTS["🧪 Pytest Suite\ntests/test_recommender.py\n✓ sorted by score\n✓ explain returns string"]
+
+    %% ── Data flow ───────────────────────────────────────────
+    CSV      --> LOADER
+    LOADER   --> AGENT
+    HUMAN    --> AGENT
+    HUMAN    --> WEIGHTS
+    WEIGHTS  --> SCORER
+    AGENT    --> SCORER
+    SCORER   --> DIVERSITY
+    DIVERSITY --> AGENT
+    AGENT    --> EXPLAIN
+    EXPLAIN  --> OUTPUT
+    OUTPUT   --> REVIEW
+
+    %% ── Testing hooks ───────────────────────────────────────
+    AGENT    -.->|"unit test"| TESTS
+    EXPLAIN  -.->|"unit test"| TESTS
+    TESTS    -.->|"pass / fail"| REVIEW
+
+    %% ── Styles ──────────────────────────────────────────────
+    style HUMAN    fill:#d4edda,stroke:#28a745,color:#000
+    style REVIEW   fill:#d4edda,stroke:#28a745,color:#000
+    style TESTS    fill:#fff3cd,stroke:#ffc107,color:#000
+    style AGENT    fill:#cce5ff,stroke:#004085,color:#000
+    style SCORER   fill:#cce5ff,stroke:#004085,color:#000
+    style DIVERSITY fill:#cce5ff,stroke:#004085,color:#000
+    style EXPLAIN  fill:#cce5ff,stroke:#004085,color:#000
+    style CSV      fill:#f8d7da,stroke:#721c24,color:#000
+    style LOADER   fill:#f8d7da,stroke:#721c24,color:#000
+    style WEIGHTS  fill:#e2d9f3,stroke:#6f42c1,color:#000
+    style OUTPUT   fill:#f0f0f0,stroke:#666,color:#000
+```
+
+Color key:
+  Green  — human involvement (input profiles, review of results)
+  Blue   — AI/processing components (recommender pipeline)
+  Red    — data layer (CSV + loader)
+  Purple — configuration (weights / ranking modes)
+  Yellow — testing layer
+  Dotted — test hooks checking AI outputs

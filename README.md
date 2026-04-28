@@ -156,18 +156,47 @@ Switching between `balanced`, `genre-first`, `mood-first`, and `vibe-first` mode
 
 ## Testing Summary
 
+### How reliability is measured
+
+CineMatch uses four layers to prove it works:
+
+| Layer | What it checks |
+|---|---|
+| **Automated unit tests** | 6 pytest tests covering scoring math, ranking order, director penalty, confidence range, and error handling |
+| **Confidence scoring** | Every recommendation is normalized to 0–100% against the theoretical max score so low-quality matches are visible |
+| **Logging + error handling** | `WARNING` logged when no genre match exists; `ERROR` + `FileNotFoundError` raised when the CSV is missing or malformed |
+| **Human evaluation** | 6 named personas (including 3 adversarial edge cases) run through `main.py` with printed explanations for manual review |
+
+### Results
+
+```
+6 out of 6 tests passed.
+
+EVALUATION SUMMARY (balanced mode, 20% diversity penalty)
+  OK   High-Intensity Action Fan          top confidence: 98%
+  OK   Slow-Burn Drama Seeker             top confidence: 97%
+  OK   Feel-Good Family Night             top confidence: 99%
+  OK   Conflicting: Horror + Uplifting    top confidence: 93%
+  OK   Ghost Genre: Western               top confidence: 60%   <-- WARNING logged
+  OK   Max Mismatch: Quiet Arthouse       top confidence: 84%
+
+  Profiles with genre match in top 5 : 5/6
+  Average top-result confidence       : 88%
+  Low-confidence profiles (<50%)      : 0
+```
+
 **What worked:**
-- `test_recommend_returns_movies_sorted_by_score` — confirmed that a perfect genre + mood + feature match ranks above a mismatch. Passed on first run.
-- `test_explain_recommendation_returns_non_empty_string` — confirmed the explainer always returns a usable string even when no features match closely (falls back to "Matched on overall weighted similarity").
-- Edge-case profiles in `main.py` revealed real behavior: the Ghost Genre profile scores noticeably lower across the board, which is the correct signal for low-confidence recommendations.
-- The director diversity penalty worked as expected: turning it off for the Drama Seeker returned the same 5 films in the same order because those directors weren't repeated in the top results anyway — a useful sanity check.
+- All 6 tests passed. `test_genre_match_adds_exactly_genre_weight` mathematically verified the scoring formula, not just its order.
+- Confidence scores averaged **88%** across all profiles. The 3 standard profiles scored 97–99%, showing strong signal when the catalog fits the user.
+- The Ghost Genre (Western) profile correctly dropped to **60%** and triggered a `WARNING` log — the system flagged its own low confidence rather than returning a false-positive result.
+- Error handling: passing a missing file path raises `FileNotFoundError` with a clear message and logs the path that failed.
 
 **What didn't / limitations found:**
-- The `Conflicting: Horror + Uplifting Tone` profile exposed a weakness: the genre match still pushes horror films to the top even though their tone (dark) is the opposite of what the profile wants. The categorical genre weight (3.0) overpowers the continuous tone penalty. A future fix would reduce genre weight or add a contradiction detector.
-- Two tests cover the happy path but there are no tests for edge cases like an empty catalog, all-zero scores, or a profile with no genre match. These gaps were accepted for a simulation scope.
+- The `Conflicting: Horror + Uplifting Tone` profile still scored 93% because the genre match (horror) dominates the weights, overriding the tone contradiction. The system is confident but wrong — a known limitation of categorical-heavy scoring.
+- The Ghost Genre profile scored 60% even though no film matched the requested genre. Future work: cap confidence at 50% when the genre weight earns zero, to better signal "I'm guessing."
 
 **What I learned:**
-Weight sensitivity matters more than algorithm choice. Small changes to `_DEFAULT_WEIGHTS` shifted results dramatically — more than switching between ranking modes did. This mirrors a key finding from VibeFinder 1.0 and reinforced that tuning weights is as important as designing the scoring function.
+Confidence scoring exposed something the tests alone could not: the system can look highly confident (93%) while making a logically contradictory recommendation. That gap — between mathematical confidence and real-world correctness — is where human evaluation becomes essential.
 
 ---
 

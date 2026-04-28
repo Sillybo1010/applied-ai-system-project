@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -5,6 +6,11 @@ try:
     from recommender import UserProfile, Recommender, load_movies
 except ImportError:
     from src.recommender import UserProfile, Recommender, load_movies
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s  %(message)s",
+)
 
 try:
     from tabulate import tabulate
@@ -89,11 +95,13 @@ profiles = [
 def results_to_table(results, rec: Recommender, profile: UserProfile) -> str:
     rows = []
     for rank, (movie, score) in enumerate(results, 1):
+        conf = rec.confidence_for(score)
         explanation = rec.explain_recommendation(profile, movie).replace("\n", " | ")
         rows.append([
             rank,
             f"{movie.title} / {movie.director}",
             f"{score:.4f}",
+            f"{conf:.0%}",
             f"{movie.genre} / {movie.mood}",
             f"{movie.intensity:.2f}",
             f"{movie.tone:.2f}",
@@ -101,7 +109,7 @@ def results_to_table(results, rec: Recommender, profile: UserProfile) -> str:
             f"{movie.dialogue_heavy:.2f}",
             explanation,
         ])
-    headers = ["#", "Title / Director", "Score", "Genre / Mood",
+    headers = ["#", "Title / Director", "Score", "Conf.", "Genre / Mood",
                "Intens.", "Tone", "Pacing", "Dialogue", "Why"]
     return tabulate(rows, headers=headers, tablefmt="grid")
 
@@ -149,3 +157,36 @@ if __name__ == "__main__":
         results = rec.recommend(drama, k=5, mode="balanced", diversity_penalty=penalty)
         titles = ", ".join(m.title for m, _ in results)
         print(f"  {label}: {titles}")
+
+    # ── Evaluation summary ────────────────────────────────────────────────────
+    print(f"\n{'='*70}")
+    print("EVALUATION SUMMARY")
+    print(f"{'='*70}")
+
+    conf_scores = []
+    genre_hit_count = 0
+    low_conf_profiles = []
+
+    for profile in profiles:
+        results = rec.recommend(profile, k=5, mode="balanced", diversity_penalty=0.20)
+        top_conf = rec.confidence_for(results[0][1]) if results else 0.0
+        conf_scores.append(top_conf)
+
+        has_genre_hit = any(
+            m.genre.lower() == profile.favorite_genre.lower() for m, _ in results
+        )
+        if has_genre_hit:
+            genre_hit_count += 1
+        if top_conf < 0.50:
+            low_conf_profiles.append(profile.name)
+
+        flag = "! LOW CONF" if top_conf < 0.50 else "OK"
+        print(f"  {flag}  {profile.name:<40}  top confidence: {top_conf:.0%}")
+
+    avg_conf = sum(conf_scores) / len(conf_scores)
+    print(f"\n  Profiles with genre match in top 5 : {genre_hit_count}/{len(profiles)}")
+    print(f"  Average top-result confidence       : {avg_conf:.0%}")
+    print(f"  Low-confidence profiles (<50%)      : {len(low_conf_profiles)}")
+    if low_conf_profiles:
+        for name in low_conf_profiles:
+            print(f"    - {name}")

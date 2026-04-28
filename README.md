@@ -115,7 +115,7 @@ python -m pytest tests/ -v
 
 ## Demo Walkthrough
 
-> **Loom video:** [https://www.loom.com/share/REPLACE-WITH-YOUR-LOOM-ID](https://www.loom.com/share/REPLACE-WITH-YOUR-LOOM-ID)
+> **Loom video:** [https://www.loom.com/share/c884deef8ec84136844f8c46a7ed98c1](https://www.loom.com/share/c884deef8ec84136844f8c46a7ed98c1)
 >
 > The walkthrough shows `python src/main.py` running end-to-end: three user profiles (Action Fan, Drama Seeker, Ghost Genre Western), the RAG before/after uplift section, and the evaluation summary. Below are the same three examples as text output.
 

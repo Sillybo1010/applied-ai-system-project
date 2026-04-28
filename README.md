@@ -115,6 +115,8 @@ python -m pytest tests/ -v
 
 ## Demo Walkthrough
 
+> **Live app:** [https://applied-ai-system-project-f8brrkdcq83b3f3ppmqhgl.streamlit.app/](https://applied-ai-system-project-f8brrkdcq83b3f3ppmqhgl.streamlit.app/)
+>
 > **Loom video:** [https://www.loom.com/share/c884deef8ec84136844f8c46a7ed98c1](https://www.loom.com/share/c884deef8ec84136844f8c46a7ed98c1)
 >
 > The walkthrough shows `python src/main.py` running end-to-end: three user profiles (Action Fan, Drama Seeker, Ghost Genre Western), the RAG before/after uplift section, and the evaluation summary. Below are the same three examples as text output.

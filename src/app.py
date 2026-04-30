@@ -3,10 +3,9 @@ CineMatch — Interactive Streamlit Web App
 Run: streamlit run src/app.py
 """
 
-import contextlib
-import io
 import os
 import sys
+import time
 
 import streamlit as st
 
@@ -16,17 +15,9 @@ from recommender import (
     UserProfile, Recommender, load_movies,
     confidence_score, _DEFAULT_WEIGHTS,
 )
-from rag_retriever import RAGRetriever
-from specializer import specialize, measure_modes, ExplainerMode
-from agent import CineAgent
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
-
-_BASE = os.path.join(os.path.dirname(__file__), "..")
+_BASE         = os.path.join(os.path.dirname(__file__), "..")
 DATA_PATH     = os.path.join(_BASE, "data", "movies.csv")
-PROFILES_PATH = os.path.join(_BASE, "data", "director_profiles.json")
-
-# ── Catalog constants ──────────────────────────────────────────────────────────
 
 GENRES = ["action", "sci-fi", "drama", "animation", "horror",
           "comedy", "thriller", "romance", "war", "western"]
@@ -34,59 +25,100 @@ MOODS  = ["thrilling", "emotional", "heartwarming", "epic", "scary",
           "quirky", "dark", "romantic", "intense", "fun", "disturbing"]
 MODES  = ["balanced", "genre-first", "mood-first", "vibe-first"]
 
+RATE_LIMIT    = 10      # max requests
+WINDOW_SECS   = 3600    # per hour
 
-# ── Cached data loading ────────────────────────────────────────────────────────
 
 @st.cache_resource
 def load_data():
     movies = load_movies(DATA_PATH)
-    rag    = RAGRetriever(PROFILES_PATH)
-    rec    = Recommender(movies)
-    agent  = CineAgent(DATA_PATH, PROFILES_PATH)
-    return movies, rag, rec, agent
+    return Recommender(movies)
+
+
+# ── Rate limiter ──────────────────────────────────────────────────────────────
+
+def requests_this_hour() -> list:
+    """Return timestamps from the last hour, pruning stale ones."""
+    now = time.time()
+    history = st.session_state.get("request_times", [])
+    fresh = [t for t in history if now - t < WINDOW_SECS]
+    st.session_state["request_times"] = fresh
+    return fresh
+
+
+def record_request():
+    history = st.session_state.get("request_times", [])
+    history.append(time.time())
+    st.session_state["request_times"] = history
+
+
+def rate_limit_status():
+    history = requests_this_hour()
+    used      = len(history)
+    remaining = RATE_LIMIT - used
+    if history:
+        oldest      = min(history)
+        resets_in   = int(WINDOW_SECS - (time.time() - oldest))
+        reset_mins  = resets_in // 60
+        reset_secs  = resets_in % 60
+        reset_str   = f"{reset_mins}m {reset_secs}s"
+    else:
+        reset_str = "—"
+    return used, remaining, reset_str
 
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
-st.set_page_config(
-    page_title="CineMatch",
-    page_icon="🎬",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.set_page_config(page_title="CineMatch", page_icon="🎬", layout="wide")
 
-st.title("🎬 CineMatch — Movie Recommender")
-st.caption("Content-based recommendation with RAG augmentation, agentic reasoning, and multi-tone explanations.")
+st.title("🎬 CineMatch")
+st.caption("Tell us what you're in the mood for and we'll find the right film.")
 
-movies, rag, rec, agent = load_data()
+rec = load_data()
 
 # ── Sidebar — Profile Builder ─────────────────────────────────────────────────
 
 with st.sidebar:
-    st.header("Your Taste Profile")
+    st.header("What are you in the mood for?")
 
     name = st.text_input("Your name", value="Movie Fan")
 
     col1, col2 = st.columns(2)
     with col1:
-        genre = st.selectbox("Favorite genre", GENRES, index=0)
+        genre = st.selectbox("Favourite genre", GENRES)
     with col2:
         mood = st.selectbox("Preferred mood", MOODS, index=8)
 
-    intensity  = st.slider("Intensity",          0.0, 1.0, 0.80, 0.05,
-                           help="0 = calm / contemplative, 1 = high-octane")
-    runtime    = st.slider("Target runtime (min)", 60, 210, 120, 5)
-    tone       = st.slider("Tone preference",     0.0, 1.0, 0.50, 0.05,
-                           help="0 = dark / bleak, 1 = uplifting / hopeful")
-    pacing     = st.slider("Pacing preference",   0.0, 1.0, 0.75, 0.05,
-                           help="0 = slow / contemplative, 1 = fast-paced")
-    dialogue   = st.slider("Dialogue preference", 0.0, 1.0, 0.30, 0.05,
-                           help="0 = visual / action-driven, 1 = dialogue-heavy")
+    intensity = st.slider("Intensity",            0.0, 1.0, 0.80, 0.05,
+                          help="0 = calm, 1 = high-octane")
+    runtime   = st.slider("Target runtime (min)", 60, 210, 120, 5)
+    tone      = st.slider("Tone",                 0.0, 1.0, 0.50, 0.05,
+                          help="0 = dark, 1 = uplifting")
+    pacing    = st.slider("Pacing",               0.0, 1.0, 0.75, 0.05,
+                          help="0 = slow, 1 = fast-paced")
+    dialogue  = st.slider("Dialogue-driven",      0.0, 1.0, 0.30, 0.05,
+                          help="0 = visual/action, 1 = lots of dialogue")
 
     st.divider()
+    top_k     = st.slider("Number of results", 1, 10, 5)
     mode      = st.selectbox("Ranking mode", MODES)
-    top_k     = st.slider("Results to show", 1, 10, 5)
-    diversity = st.checkbox("Director diversity penalty (−20%)", value=True)
+    diversity = st.checkbox("Avoid repeat directors", value=True)
+
+    st.divider()
+
+    # Rate limit display
+    used, remaining, reset_str = rate_limit_status()
+    st.caption("Usage this hour")
+    st.progress(used / RATE_LIMIT, text=f"{used} / {RATE_LIMIT} searches used")
+    if remaining > 0:
+        st.caption(f"Resets in {reset_str}" if used > 0 else "")
+    else:
+        st.error(f"Limit reached — resets in {reset_str}")
+
+    search = st.button("Find Films", type="primary", use_container_width=True,
+                       disabled=(remaining == 0))
+
+# ── Build profile ─────────────────────────────────────────────────────────────
 
 profile = UserProfile(
     name=name,
@@ -101,329 +133,74 @@ profile = UserProfile(
 
 penalty = 0.20 if diversity else 0.0
 
-# ── Tabs ──────────────────────────────────────────────────────────────────────
+# ── On search click: record request and cache results ─────────────────────────
 
-tab_rec, tab_agent, tab_rag, tab_spec, tab_eval = st.tabs([
-    "Recommendations",
-    "Agent Trace",
-    "RAG Demo",
-    "Specializer",
-    "Eval Harness",
-])
-
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 1 — Recommendations
-# ─────────────────────────────────────────────────────────────────────────────
-
-with tab_rec:
-    st.subheader(f"Top {top_k} picks for {name or 'you'}")
-
+if search:
+    record_request()
     results = rec.recommend(profile, k=top_k, mode=mode, diversity_penalty=penalty)
-    weights = _DEFAULT_WEIGHTS[mode]
+    st.session_state["last_results"] = results
+    st.session_state["last_profile"] = profile
+    st.session_state["last_mode"]    = mode
+    st.session_state["last_genre"]   = genre
+    _, remaining, reset_str = rate_limit_status()
 
-    genre_hits = sum(1 for m, _ in results if m.genre.lower() == genre.lower())
-    top_conf   = confidence_score(results[0][1], weights) if results else 0.0
+# ── Display results ───────────────────────────────────────────────────────────
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Top result confidence", f"{top_conf:.0%}")
-    m2.metric("Genre matches in results", f"{genre_hits} / {len(results)}")
-    m3.metric("Ranking mode", mode)
+if "last_results" not in st.session_state:
+    st.info("Set your preferences in the sidebar and click **Find Films** to get recommendations.")
+    st.stop()
 
-    if genre_hits == 0:
-        st.warning(f"No '{genre}' films in the catalog — showing best vibe matches instead.")
+results  = st.session_state["last_results"]
+weights  = _DEFAULT_WEIGHTS[st.session_state["last_mode"]]
+last_genre = st.session_state["last_genre"]
 
-    st.divider()
+genre_hits = sum(1 for m, _ in results if m.genre.lower() == last_genre.lower())
+top_conf   = confidence_score(results[0][1], weights) if results else 0.0
 
-    for rank, (movie, score) in enumerate(results, 1):
-        conf = confidence_score(score, weights)
-        conf_color = "green" if conf >= 0.80 else ("orange" if conf >= 0.55 else "red")
+c1, c2, c3 = st.columns(3)
+c1.metric("Best match confidence", f"{top_conf:.0%}")
+c2.metric("Genre matches", f"{genre_hits} / {len(results)}")
+c3.metric("Ranking mode", st.session_state["last_mode"])
 
-        with st.expander(
-            f"#{rank}  **{movie.title}** ({movie.director})  —  "
-            f":{conf_color}[{conf:.0%} confidence]",
-            expanded=(rank == 1),
-        ):
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Raw score", f"{score:.4f}")
-            c2.metric("Confidence", f"{conf:.0%}")
-            c3.metric("Genre / Mood", f"{movie.genre} / {movie.mood}")
+if genre_hits == 0:
+    st.warning(f"No '{last_genre}' films in the catalog — showing closest vibe matches.")
 
-            c4, c5, c6, c7 = st.columns(4)
-            c4.metric("Intensity",  f"{movie.intensity:.2f}")
-            c5.metric("Tone",       f"{movie.tone:.2f}")
-            c6.metric("Pacing",     f"{movie.pacing:.2f}")
-            c7.metric("Runtime",    f"{movie.runtime_min} min")
+st.divider()
 
-            st.markdown("**Why this film?**")
-            explanation = rec.explain_recommendation(profile, movie)
-            st.code(explanation, language=None)
+last_profile = st.session_state["last_profile"]
 
+for rank, (movie, score) in enumerate(results, 1):
+    conf = confidence_score(score, weights)
+    conf_color = "green" if conf >= 0.80 else ("orange" if conf >= 0.55 else "red")
+
+    with st.expander(
+        f"#{rank}  **{movie.title}**  ·  {movie.director}  —  :{conf_color}[{conf:.0%} match]",
+        expanded=(rank == 1),
+    ):
+        col_a, col_b = st.columns([1, 2])
+
+        with col_a:
+            st.markdown(f"**Genre:** {movie.genre}")
+            st.markdown(f"**Mood:** {movie.mood}")
+            st.markdown(f"**Runtime:** {movie.runtime_min} min")
+            st.markdown(f"**Decade:** {movie.release_decade}")
+            st.markdown(f"**Language:** {movie.language}")
             if movie.awards:
-                st.success("Award-winning film")
+                st.success("Award winner")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 2 — Agent Trace
-# ─────────────────────────────────────────────────────────────────────────────
+        with col_b:
+            st.markdown("**Why this film?**")
+            explanation = rec.explain_recommendation(last_profile, movie)
+            for line in explanation.split("\n")[1:]:
+                st.markdown(f"- {line.strip()}")
 
-with tab_agent:
-    st.subheader("5-Step Agentic Reasoning Chain")
-    st.caption("CineAgent.run() makes every intermediate decision observable.")
-
-    if st.button("Run Agent", type="primary"):
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            agent_results = agent.run(profile, k=top_k, verbose=True)
-        trace = buf.getvalue()
-
-        st.code(trace, language=None)
-
-        st.divider()
-        st.markdown("**Agent results with RAG context**")
-        for rank, (movie, score, rag_ctx) in enumerate(agent_results, 1):
-            conf = confidence_score(score, _DEFAULT_WEIGHTS["balanced"])
-            with st.expander(f"#{rank}  {movie.title}  ({conf:.0%} conf)", expanded=(rank == 1)):
-                st.write(f"**Director:** {movie.director}  |  **Genre/Mood:** {movie.genre} / {movie.mood}")
-                if rag_ctx:
-                    st.info(f"[RAG] {rag_ctx}")
-                else:
-                    st.caption("No RAG profile available for this director.")
-    else:
-        st.info("Click **Run Agent** to see the 5-step reasoning chain for your current profile.")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 3 — RAG Demo
-# ─────────────────────────────────────────────────────────────────────────────
-
-with tab_rag:
-    st.subheader("RAG Enhancement — Before vs After")
-    st.caption(
-        "The base recommender explains matches using feature similarity only. "
-        "RAG augments each explanation with director style context from a second data source."
-    )
-
-    demo_results = rec.recommend(profile, k=1, mode=mode)
-    if demo_results:
-        demo_movie, demo_score = demo_results[0]
-        base_exp = rec.explain_recommendation(profile, demo_movie)
-        aug_exp  = rag.augment_explanation(base_exp, demo_movie, profile)
-        uplift   = RAGRetriever.measure_improvement(base_exp, aug_exp)
-
-        st.markdown(f"**Showing for:** {demo_movie.title} (director: {demo_movie.director})")
-        st.divider()
-
-        left, right = st.columns(2)
-        with left:
-            st.markdown("#### Base explanation")
-            st.caption("No RAG context")
-            st.code(base_exp, language=None)
-            st.metric("Word count", uplift["base_words"])
-
-        with right:
-            st.markdown("#### RAG-augmented explanation")
-            st.caption("Director profile retrieved from director_profiles.json")
-            st.code(aug_exp, language=None)
-            st.metric("Word count", uplift["aug_words"],
-                      delta=f"+{uplift['added_words']} words (+{uplift['pct_increase']}%)")
-
-        st.divider()
-        st.markdown("**All directors with RAG profiles in this result set**")
-        rag_results = rec.recommend(profile, k=top_k, mode=mode)
-        rows = []
-        for movie, score in rag_results:
-            ctx = rag.retrieve_director_context(movie.director)
-            rows.append({
-                "Film":    movie.title,
-                "Director": movie.director,
-                "RAG context": ctx if ctx else "—",
-            })
-        st.table(rows)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 4 — Specializer
-# ─────────────────────────────────────────────────────────────────────────────
-
-with tab_spec:
-    st.subheader("Few-Shot Explanation Specializer")
-    st.caption(
-        "The same recommendation is explained in three constrained tones. "
-        "`measure_modes()` quantifies the difference in word count and lexical diversity."
-    )
-
-    spec_results = rec.recommend(profile, k=1, mode=mode)
-    if spec_results:
-        spec_movie, _ = spec_results[0]
-        measurements  = measure_modes(spec_movie, profile)
-
-        st.markdown(f"**Film:** {spec_movie.title} &nbsp;|&nbsp; **Director:** {spec_movie.director}")
-        st.divider()
-
-        c_std, c_cas, c_cin = st.columns(3)
-
-        with c_std:
-            st.markdown("#### Standard")
-            st.caption("Feature-by-feature match report")
-            d = measurements["standard"]
-            st.code(d["text"], language=None)
-            st.metric("Words",            d["word_count"])
-            st.metric("Lexical diversity", d["lexical_diversity"])
-
-        with c_cas:
-            st.markdown("#### Casual")
-            st.caption("Short, friendly, plain language")
-            d = measurements["casual"]
-            st.code(d["text"], language=None)
-            st.metric("Words",            d["word_count"])
-            st.metric("Lexical diversity", d["lexical_diversity"])
-
-        with c_cin:
-            st.markdown("#### Cinephile")
-            st.caption("Film-theory vocabulary, directorial analysis")
-            d = measurements["cinephile"]
-            st.code(d["text"], language=None)
-            st.metric("Words",            d["word_count"])
-            st.metric("Lexical diversity", d["lexical_diversity"])
-
-        st.divider()
-        st.markdown("**Try any film directly**")
-        all_titles = [m.title for m in movies]
-        chosen = st.selectbox("Select a film", all_titles)
-        chosen_movie = next(m for m in movies if m.title == chosen)
-        chosen_mode  = st.radio("Explanation mode", ["standard", "casual", "cinephile"],
-                                horizontal=True)
-        mode_map = {
-            "standard":  ExplainerMode.STANDARD,
-            "casual":    ExplainerMode.CASUAL,
-            "cinephile": ExplainerMode.CINEPHILE,
-        }
-        st.code(specialize(chosen_movie, profile, mode_map[chosen_mode]), language=None)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 5 — Eval Harness
-# ─────────────────────────────────────────────────────────────────────────────
-
-with tab_eval:
-    st.subheader("Evaluation Harness")
-    st.caption("8 predefined test cases covering core recommender, RAG, and specializer behaviour.")
-
-    if st.button("Run All Tests", type="primary"):
-
-        def make_profile(**kw):
-            base = dict(
-                name="Test", favorite_genre="action", preferred_mood="intense",
-                target_intensity=0.80, target_runtime=120,
-                tone_preference=0.50, pacing_preference=0.80, dialogue_preference=0.20,
-            )
-            base.update(kw)
-            return UserProfile(**base)
-
-        weights_bal = _DEFAULT_WEIGHTS["balanced"]
-
-        tests = [
-            {
-                "name": "Action fan: genre match in top result",
-                "run":  lambda: rec.recommend(make_profile(favorite_genre="action"), k=5),
-                "check": lambda r: r[0][0].genre.lower() == "action",
-            },
-            {
-                "name": "Drama seeker: genre match in top result",
-                "run":  lambda: rec.recommend(
-                    make_profile(favorite_genre="drama", preferred_mood="emotional",
-                                 target_intensity=0.25, pacing_preference=0.25,
-                                 dialogue_preference=0.95, target_runtime=140), k=5),
-                "check": lambda r: r[0][0].genre.lower() == "drama",
-            },
-            {
-                "name": "Animation fan: animation in top 3",
-                "run":  lambda: rec.recommend(
-                    make_profile(favorite_genre="animation", preferred_mood="heartwarming",
-                                 target_intensity=0.45, tone_preference=0.90,
-                                 target_runtime=95), k=5),
-                "check": lambda r: any(m.genre.lower() == "animation" for m, _ in r[:3]),
-            },
-            {
-                "name": "Results sorted highest score first",
-                "run":  lambda: rec.recommend(make_profile(), k=5),
-                "check": lambda r: all(r[i][1] >= r[i+1][1] for i in range(len(r)-1)),
-            },
-            {
-                "name": "Confidence always 0.0–1.0",
-                "run":  lambda: rec.recommend(make_profile(), k=5),
-                "check": lambda r: all(0.0 <= confidence_score(s, weights_bal) <= 1.0 for _, s in r),
-            },
-            {
-                "name": "Ghost genre confidence < real genre match",
-                "run":  lambda: (
-                    rec.recommend(make_profile(favorite_genre="western"), k=5),
-                    rec.recommend(make_profile(favorite_genre="action"),  k=5),
-                ),
-                "check": lambda pair: (
-                    confidence_score(pair[0][0][1], weights_bal)
-                    < confidence_score(pair[1][0][1], weights_bal)
-                ),
-            },
-            {
-                "name": "RAG: augmented explanation longer than base",
-                "run":  lambda: rec.recommend(make_profile(), k=1)[0],
-                "check": lambda t: (
-                    RAGRetriever.measure_improvement(
-                        rec.explain_recommendation(make_profile(), t[0]),
-                        rag.augment_explanation(
-                            rec.explain_recommendation(make_profile(), t[0]),
-                            t[0], make_profile()
-                        )
-                    )["added_words"] > 0
-                ),
-            },
-            {
-                "name": "Specializer: cinephile longer than casual",
-                "run":  lambda: rec.recommend(make_profile(), k=1)[0][0],
-                "check": lambda m: (
-                    measure_modes(m, make_profile())["cinephile"]["word_count"]
-                    > measure_modes(m, make_profile())["casual"]["word_count"]
-                ),
-            },
-        ]
-
-        passed = failed = 0
-        conf_scores = []
-        rows = []
-
-        for tc in tests:
-            try:
-                result = tc["run"]()
-                ok = tc["check"](result)
-                if isinstance(result, list) and result and isinstance(result[0], tuple):
-                    conf_scores.append(confidence_score(result[0][1], weights_bal))
-            except Exception as exc:
-                ok = False
-                rows.append({"Result": "ERROR", "Test": tc["name"], "Note": str(exc)})
-                failed += 1
-                continue
-
-            status = "PASS" if ok else "FAIL"
-            passed += ok
-            failed += (not ok)
-            rows.append({"Result": status, "Test": tc["name"], "Note": ""})
-
-        avg_conf = sum(conf_scores) / len(conf_scores) if conf_scores else 0.0
-
-        # Summary metrics
-        mc1, mc2, mc3 = st.columns(3)
-        mc1.metric("Passed", f"{passed} / {len(tests)}")
-        mc2.metric("Failed", str(failed))
-        mc3.metric("Avg top confidence", f"{avg_conf:.0%}")
-
-        # Results table with colour
-        for row in rows:
-            icon = "✅" if row["Result"] == "PASS" else ("❌" if row["Result"] == "FAIL" else "⚠️")
-            if row["Result"] == "PASS":
-                st.success(f"{icon}  {row['Test']}")
-            elif row["Result"] == "FAIL":
-                st.error(f"{icon}  {row['Test']}")
-            else:
-                st.warning(f"{icon}  {row['Test']}  —  {row['Note']}")
-
-        if failed == 0:
-            st.balloons()
-    else:
-        st.info("Click **Run All Tests** to execute the 8-case evaluation harness.")
+            st.markdown("**Feature breakdown**")
+            fa, fb, fc, fd = st.columns(4)
+            fa.metric("Intensity", f"{movie.intensity:.2f}",
+                      delta=f"{movie.intensity - last_profile.target_intensity:+.2f}")
+            fb.metric("Tone",      f"{movie.tone:.2f}",
+                      delta=f"{movie.tone - last_profile.tone_preference:+.2f}")
+            fc.metric("Pacing",    f"{movie.pacing:.2f}",
+                      delta=f"{movie.pacing - last_profile.pacing_preference:+.2f}")
+            fd.metric("Dialogue",  f"{movie.dialogue_heavy:.2f}",
+                      delta=f"{movie.dialogue_heavy - last_profile.dialogue_preference:+.2f}")
